@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Data Ingestion Form</title>
+</head>
+<body>
+    <h1>Microservice Data Input</h1>
+    <p>Deployed via Jenkins and Helm!</p>
+    
+    <form action="/submit-form" method="POST">
+        <label for="user_name">Enter Your Name:</label><br>
+        <input type="text" id="user_name" name="user_name" required><br><br>
+        
+        <label for="favorite_color">Enter Favorite Color:</label><br>
+        <input type="text" id="favorite_color" name="favorite_color"><br><br>
+        
+        <input type="submit" value="Submit Data">
+    </form>
+    
+    {% if result %}
+    <hr>
+    <h2>Submission Result:</h2>
+    <p style="color: green;">{{ result }}</p>
+    {% endif %}
+
+</body>
+</html>
