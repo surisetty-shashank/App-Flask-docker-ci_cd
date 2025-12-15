@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Docker
+# Ignore large image files created by Docker Desktop/Engine
+.docker/
+
+# Environment
+.DS_Store
