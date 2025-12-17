@@ -45,25 +45,26 @@ pipeline {
         }
 
         stage('Deploy to GKE with Helm') {
-            steps {
-                echo 'Deploying to GKE Cluster via Helm...'
-                withCredentials([file(credentialsId: "${GCP_CREDS_ID}", variable: 'GCP_KEY')]) {
-                    // 1. Connect kubectl/helm to your GKE cluster
-                    sh "gcloud auth activate-service-account --key-file=${GCP_KEY}"
-                    sh "gcloud container clusters get-credentials ${CLUSTER_NAME} --region ${LOCATION} --project ${PROJECT_ID}"
-
-                    // 2. Run Helm Upgrade/Install
-                    // This sets the new image tag to the current Jenkins Build Number
-                    sh """
-                    helm upgrade --install flask-app-release ./flask-chart \
-                        --set image.repository=${REPO_PATH}/${IMAGE_NAME} \
-                        --set image.tag=${BUILD_NUMBER} \
-                        --wait
-                    """
-                }
-            }
-        }
-
+		    steps {
+		        echo 'Deploying to GKE Cluster via Helm...'
+		        withCredentials([file(credentialsId: "${GCP_CREDS_ID}", variable: 'GCP_KEY')]) {
+		            // 1. Connect kubectl/helm to your GKE cluster
+		            sh "gcloud auth activate-service-account --key-file=${GCP_KEY}"
+		            sh "gcloud container clusters get-credentials ${CLUSTER_NAME} --region ${LOCATION} --project ${PROJECT_ID}"
+		
+		            // 2. Run Helm Upgrade/Install
+		            // Added --timeout 15m and --atomic=false to prevent premature failure
+		            sh """
+		            helm upgrade --install flask-app-release ./flask-chart \
+		                --set image.repository=${REPO_PATH}/${IMAGE_NAME} \
+		                --set image.tag=${BUILD_NUMBER} \
+		                --wait \
+		                --timeout 15m \
+		                --atomic=false
+		            """
+		        }
+		    }
+		}
         stage('Post-Deployment Verification') {
             steps {
                 echo 'Fetching the External IP of your application...'
