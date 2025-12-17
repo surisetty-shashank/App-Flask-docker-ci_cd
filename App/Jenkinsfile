@@ -2,8 +2,20 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_PATH = '/usr/local/bin/docker'
-        PATH = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+        // --- PATH SETTINGS (From your previous setup) ---
+        DOCKER_PATH  = '/usr/local/bin/docker'
+        PATH         = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+        // --- GCP / CLOUD SETTINGS ---
+        PROJECT_ID   = 'flask-app-gke-project'
+        LOCATION     = 'us-central1'
+        REPO_PATH    = 'us-central1-docker.pkg.dev/flask-app-gke-project/test-repo'
+        IMAGE_NAME   = 'simple-app'
+        CLUSTER_NAME = 'flask-cluster' 
+        
+        // --- CREDENTIALS ID ---
+        // Ensure you have a 'Secret File' credential in Jenkins with this exact ID
+        GCP_CREDS_ID = 'gcp-key'
     }
 
     stages {
@@ -14,55 +26,63 @@ pipeline {
             }
         }
 
-        stage('Build Image') {
+        stage('Build and Push Image') {
             steps {
-                echo 'Building Docker Image from App directory...'
-                // dir('App') moves the execution context into your subfolder
-                dir('App') {
-                    sh "${DOCKER_PATH} build -t simple-app -f container ."
+                echo 'Authenticating and Building Docker Image...'
+                withCredentials([file(credentialsId: "${GCP_CREDS_ID}", variable: 'GCP_KEY')]) {
+                    // 1. Authenticate with Google Cloud
+                    sh "gcloud auth activate-service-account --key-file=${GCP_KEY}"
+                    sh "gcloud auth configure-docker ${LOCATION}-docker.pkg.dev --quiet"
+
+                    // 2. Build the image (Moving into 'App' folder where your 'container' file is)
+                    dir('App') {
+                        sh "${DOCKER_PATH} build -t ${REPO_PATH}/${IMAGE_NAME}:${BUILD_NUMBER} -f container ."
+                    }
+                    
+                    // 3. Push to Artifact Registry
+                    sh "${DOCKER_PATH} push ${REPO_PATH}/${IMAGE_NAME}:${BUILD_NUMBER}"
                 }
             }
         }
 
-        stage('Deploy Container') {
+        stage('Deploy to GKE with Helm') {
             steps {
-                echo 'Deploying Container...'
-                script {
-                    sh "${DOCKER_PATH} rm -f my-flask-app || true"
-                    sh "${DOCKER_PATH} run -d --name my-flask-app -p 5001:5000 simple-app"
+                echo 'Deploying to GKE Cluster via Helm...'
+                withCredentials([file(credentialsId: "${GCP_CREDS_ID}", variable: 'GCP_KEY')]) {
+                    // 1. Connect kubectl/helm to your GKE cluster
+                    sh "gcloud auth activate-service-account --key-file=${GCP_KEY}"
+                    sh "gcloud container clusters get-credentials ${CLUSTER_NAME} --region ${LOCATION} --project ${PROJECT_ID}"
+
+                    // 2. Run Helm Upgrade/Install
+                    // This sets the new image tag to the current Jenkins Build Number
+                    sh """
+                    helm upgrade --install flask-app-release ./flask-chart \
+                        --set image.repository=${REPO_PATH}/${IMAGE_NAME} \
+                        --set image.tag=${BUILD_NUMBER} \
+                        --wait
+                    """
                 }
             }
         }
 
-        stage('Health Check') {
+        stage('Post-Deployment Verification') {
             steps {
-                echo 'Verifying Application Health...'
-                sleep 5
-                // Testing the local mapping on port 5001
-                sh "curl -f http://localhost:5001 || (echo 'App failed to respond' && exit 1)"
-            }
-        }
-
-        stage('Wait for Cleanup') {
-            steps {
-                input message: 'Finished testing? Click "Proceed" to stop the container.', ok: 'Stop Service'
-                
-                echo 'Cleaning up...'
-                sh "${DOCKER_PATH} stop my-flask-app"
-                sh "${DOCKER_PATH} rm my-flask-app"
-                // It deletes old, unused images to save disk space on your Mac
-                sh "${DOCKER_PATH} image prune -f"
+                echo 'Fetching the External IP of your application...'
+                // This gives GCP a moment to provision the LoadBalancer IP
+                sleep 10
+                sh "kubectl get service flask-app-release-flask-chart" 
             }
         }
     }
 
     post {
         success {
-            echo 'Pipeline finished! App was live at http://localhost:5001'
+            echo "SUCCESS: Version ${BUILD_NUMBER} is now live on GKE."
         }
         failure {
-            echo 'Pipeline failed. Checking logs...'
-            sh "${DOCKER_PATH} logs my-flask-app || true"
+            echo "FAILURE: Deployment failed. Please check the logs below."
+            // Try to get logs from one of the pods if deployment fails
+            sh "kubectl logs -l app.kubernetes.io/instance=flask-app-release --tail=20 || true"
         }
     }
 }
