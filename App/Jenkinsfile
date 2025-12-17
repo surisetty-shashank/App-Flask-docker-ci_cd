@@ -9,14 +9,14 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                echo '📥 Pulling latest code from GitHub...'
+                echo 'Pulling latest code from GitHub...'
                 checkout scm
             }
         }
 
         stage('Build Image') {
             steps {
-                echo '🔨 Building Docker Image from App directory...'
+                echo 'Building Docker Image from App directory...'
                 // dir('App') moves the execution context into your subfolder
                 dir('App') {
                     sh "${DOCKER_PATH} build -t simple-app -f container ."
@@ -26,7 +26,7 @@ pipeline {
 
         stage('Deploy Container') {
             steps {
-                echo '🚀 Deploying Container...'
+                echo 'Deploying Container...'
                 script {
                     sh "${DOCKER_PATH} rm -f my-flask-app || true"
                     sh "${DOCKER_PATH} run -d --name my-flask-app -p 5001:5000 simple-app"
@@ -36,7 +36,7 @@ pipeline {
 
         stage('Health Check') {
             steps {
-                echo '🔍 Verifying Application Health...'
+                echo 'Verifying Application Health...'
                 sleep 5
                 // Testing the local mapping on port 5001
                 sh "curl -f http://localhost:5001 || (echo 'App failed to respond' && exit 1)"
@@ -47,7 +47,7 @@ pipeline {
             steps {
                 input message: 'Finished testing? Click "Proceed" to stop the container.', ok: 'Stop Service'
                 
-                echo '🧹 Cleaning up...'
+                echo 'Cleaning up...'
                 sh "${DOCKER_PATH} stop my-flask-app"
                 sh "${DOCKER_PATH} rm my-flask-app"
                 // It deletes old, unused images to save disk space on your Mac
@@ -58,10 +58,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ Pipeline finished! App was live at http://localhost:5001'
+            echo 'Pipeline finished! App was live at http://localhost:5001'
         }
         failure {
-            echo '❌ Pipeline failed. Checking logs...'
+            echo 'Pipeline failed. Checking logs...'
             sh "${DOCKER_PATH} logs my-flask-app || true"
         }
     }
