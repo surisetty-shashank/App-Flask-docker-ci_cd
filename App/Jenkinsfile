@@ -3,8 +3,7 @@ pipeline {
 
     environment {
         // --- PATH SETTINGS (From your previous setup) ---
-        DOCKER_PATH  = '/usr/local/bin/docker'
-        PATH         = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+        PATH         = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
         // --- GCP / CLOUD SETTINGS ---
         PROJECT_ID   = 'flask-app-gke-project'
