@@ -35,11 +35,11 @@ pipeline {
 
                     // 2. Build the image (Moving into 'App' folder where your 'container' file is)
                     dir('App') {
-                        sh "${DOCKER_PATH} build -t ${REPO_PATH}/${IMAGE_NAME}:${BUILD_NUMBER} -f container ."
+                        sh "docker build -t ${REPO_PATH}/${IMAGE_NAME}:${BUILD_NUMBER} -f container ."
                     }
                     
                     // 3. Push to Artifact Registry
-                    sh "${DOCKER_PATH} push ${REPO_PATH}/${IMAGE_NAME}:${BUILD_NUMBER}"
+                    sh "docker push ${REPO_PATH}/${IMAGE_NAME}:${BUILD_NUMBER}"
                 }
             }
         }
