@@ -1,0 +1,74 @@
+pipeline {
+    agent any
+
+    environment {
+        // Absolute path to Docker remains necessary since Jenkins needs to know WHERE the tool is
+        DOCKER_PATH = '/usr/local/bin/docker'
+        // Ensures the Docker credential helper and other system tools are visible
+        PATH = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Pulling latest code from GitHub...'
+                // With SCM polling, Jenkins does this automatically, but this stage confirms it.
+                checkout scm
+            }
+        }
+
+        stage('Build Image') {
+            steps {
+                echo 'Building Docker Image...'
+                /* -f container: looks for the Dockerfile named 'container' in the repo root.
+                   . : tells Docker to use the current workspace as the build context.
+                */
+                sh "${DOCKER_PATH} build -t simple-app -f container ."
+            }
+        }
+
+        stage('Deploy Container') {
+            steps {
+                echo ' Deploying Container...'
+                script {
+                    // Force remove old container to prevent "Name already in use" errors
+                    sh "${DOCKER_PATH} rm -f my-flask-app || true"
+                    
+                    // Run the new container on port 5001
+                    sh "${DOCKER_PATH} run -d --name my-flask-app -p 5001:5000 simple-app"
+                }
+            }
+        }
+
+        stage('Health Check') {
+            steps {
+                echo ' Verifying Application...'
+                // Give the Flask app 5 seconds to start up
+                sleep 5
+                sh "curl -f http://localhost:5001 || (echo 'App failed to respond' && exit 1)"
+            }
+        }
+
+        stage('Wait for Cleanup') {
+            steps {
+                // This pauses the pipeline so you can view your app at http://localhost:5001
+                input message: 'Finished testing? Click Proceed to stop the container.', ok: 'Stop Service'
+                
+                echo ' Cleaning up...'
+                sh "${DOCKER_PATH} stop my-flask-app"
+                sh "${DOCKER_PATH} rm my-flask-app"
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Success: Code pushed, built, and verified!'
+        }
+        failure {
+            echo ' Failure: Something went wrong. Check the logs above.'
+            // Try to dump container logs to help you debug what happened inside the app
+            sh "${DOCKER_PATH} logs my-flask-app || true"
+        }
+    }
+}
