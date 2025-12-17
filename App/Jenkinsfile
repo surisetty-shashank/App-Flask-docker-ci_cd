@@ -50,6 +50,8 @@ pipeline {
                 echo '🧹 Cleaning up...'
                 sh "${DOCKER_PATH} stop my-flask-app"
                 sh "${DOCKER_PATH} rm my-flask-app"
+                // It deletes old, unused images to save disk space on your Mac
+                sh "${DOCKER_PATH} image prune -f"
             }
         }
     }
